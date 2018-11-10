@@ -1083,7 +1083,7 @@ class Checker(object):
 
     # "expr" type nodes
     BOOLOP = BINOP = UNARYOP = IFEXP = SET = \
-        COMPARE = CALL = REPR = ATTRIBUTE = SUBSCRIPT = \
+        COMPARE = REPR = ATTRIBUTE = SUBSCRIPT = \
         STARRED = NAMECONSTANT = handleChildren
 
     NUM = STR = BYTES = ELLIPSIS = ignore
@@ -1099,6 +1099,25 @@ class Checker(object):
         BITOR = BITXOR = BITAND = FLOORDIV = INVERT = NOT = UADD = USUB = \
         EQ = NOTEQ = LT = LTE = GT = GTE = IS = ISNOT = IN = NOTIN = \
         MATMULT = ignore
+
+    def LAZY_IMPORT(self, node):
+        from breezy.lazy_import import ImportProcessor
+        processor = ImportProcessor()
+        import_text = node.args[1].s
+        scope = {}
+        processor.lazy_import(scope, import_text)
+        for name, (path, sub, scope) in processor.imports.items():
+            importation = ImportationFrom(name, node, '.'.join(path), scope)
+            self.addBinding(node, importation)
+
+    def CALL(self, node):
+        if isinstance(node.func, ast.Name) and node.func.id == 'lazy_import':
+            self.LAZY_IMPORT(node)
+        elif (isinstance(node.func, ast.Attribute) and
+                node.func.attr == 'lazy_import' and
+                node.func.value.id == 'lazy_import'):
+            self.LAZY_IMPORT(node)
+        return self.handleChildren(node)
 
     def RAISE(self, node):
         self.handleChildren(node)
